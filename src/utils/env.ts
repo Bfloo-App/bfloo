@@ -24,6 +24,8 @@ const ENV_VAR_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
  * @returns `boolean` - True if the string contains env var notation
  */
 export function hasEnvVarNotation(value: string): boolean {
+  // Reset lastIndex since the regex has the global flag
+  ENV_VAR_PATTERN.lastIndex = 0;
   return ENV_VAR_PATTERN.test(value);
 }
 

@@ -28,22 +28,22 @@ import {
   describe,
   it,
   expect,
-  vi,
   beforeAll,
   afterAll,
   beforeEach,
-  afterEach
-} from 'vitest';
-import { vol } from 'memfs';
+  afterEach,
+  spyOn,
+  mock
+} from 'bun:test';
 
 // Project imports
-import { createCli } from '../src/cli.js';
-
-// Mock file system
-vi.mock('fs/promises');
+import { createCli } from '../src/cli';
+import * as fsModule from '../src/fs/config';
+import * as apiModule from '../src/api/client';
 
 describe('[Integration] - CLI Migration Flow', () => {
   // Setup and teardown go here
+  // Mock dependencies using spyOn for individual functions
 });
 ```
 
@@ -80,45 +80,51 @@ Write integration tests when testing:
 
 ### 1. **CLI Command Flow Tests**
 
-Test complete command execution with all components.
+Test complete command execution with all components using spies on internal modules.
 
 ```typescript
 describe('[Integration] - migrate command', () => {
-  let cli: Command;
+  let configSpy: ReturnType<typeof spyOn>;
+  let dbSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    cli = createCli();
-    vol.reset();
+    // Mock internal fs/config module functions
+    configSpy = spyOn(fsModule, 'readConfig').mockReturnValue({
+      database: 'postgres://localhost:5432/test',
+      migrationsDir: './migrations'
+    });
+
+    // Mock database module
+    dbSpy = spyOn(dbModule, 'connect').mockResolvedValue({
+      query: mock(),
+      release: mock()
+    });
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    configSpy.mockRestore();
+    dbSpy.mockRestore();
   });
 
   it('should execute migration with valid config', async () => {
-    // Setup virtual file system
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        database: 'postgres://localhost:5432/test',
-        migrationsDir: './migrations'
-      }),
-      './migrations/20240101120000_create_users.ts':
-        'export const up = () => {};'
-    });
-
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const cli = createCli();
+    const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
     await cli.parseAsync(['node', 'rune', 'migrate', 'up']);
 
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Migration complete')
     );
+    consoleSpy.mockRestore();
   });
 
   it('should fail gracefully without config file', async () => {
-    vol.fromJSON({});
+    configSpy.mockImplementation(() => {
+      throw new Error('Config file not found');
+    });
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const cli = createCli();
+    const consoleSpy = spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(
       cli.parseAsync(['node', 'rune', 'migrate', 'up'])
@@ -127,47 +133,53 @@ describe('[Integration] - migrate command', () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Config file not found')
     );
+    consoleSpy.mockRestore();
   });
 });
 ```
 
 ### 2. **Configuration Integration Tests**
 
-Test config loading and validation flow.
+Test config loading and validation flow using spies.
 
 ```typescript
+import * as fsConfigModule from '../src/fs/config';
+
 describe('[Integration] - Configuration Loading', () => {
+  let readConfigSpy: ReturnType<typeof spyOn>;
+  let writeConfigSpy: ReturnType<typeof spyOn>;
+
   beforeEach(() => {
-    vol.reset();
+    readConfigSpy = spyOn(fsConfigModule, 'readConfig');
+    writeConfigSpy = spyOn(fsConfigModule, 'writeConfig').mockImplementation(
+      () => {}
+    );
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    readConfigSpy.mockRestore();
+    writeConfigSpy.mockRestore();
   });
 
   it('should load and validate config from file', async () => {
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        database: 'postgres://localhost:5432/test',
-        migrationsDir: './migrations'
-      })
+    readConfigSpy.mockReturnValue({
+      database: 'postgres://localhost:5432/test',
+      migrationsDir: './migrations'
     });
 
-    const config = await loadConfig('./rune.config.json');
+    const config = loadConfig('./rune.config.json');
 
     expect(config.database).toBe('postgres://localhost:5432/test');
     expect(config.migrationsDir).toBe('./migrations');
   });
 
   it('should merge config with CLI options', async () => {
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        database: 'postgres://localhost:5432/test',
-        migrationsDir: './migrations'
-      })
+    readConfigSpy.mockReturnValue({
+      database: 'postgres://localhost:5432/test',
+      migrationsDir: './migrations'
     });
 
-    const config = await loadConfig('./rune.config.json', {
+    const config = loadConfig('./rune.config.json', {
       database: 'postgres://localhost:5432/override'
     });
 
@@ -175,13 +187,11 @@ describe('[Integration] - Configuration Loading', () => {
   });
 
   it('should throw on invalid config schema', async () => {
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        invalid: 'config'
-      })
+    readConfigSpy.mockImplementation(() => {
+      throw new Error('Invalid configuration');
     });
 
-    await expect(loadConfig('./rune.config.json')).rejects.toThrow(
+    expect(() => loadConfig('./rune.config.json')).toThrow(
       'Invalid configuration'
     );
   });
@@ -190,40 +200,62 @@ describe('[Integration] - Configuration Loading', () => {
 
 ### 3. **File System Integration Tests**
 
-Test migration file operations.
+Test file operations by mocking the fs module functions directly.
 
 ```typescript
+import * as fsSnapshotModule from '../src/fs/snapshot';
+import * as fsManifestModule from '../src/fs/manifest';
+
 describe('[Integration] - Migration File Operations', () => {
+  let writeSnapshotSpy: ReturnType<typeof spyOn>;
+  let readSnapshotSpy: ReturnType<typeof spyOn>;
+  let listSnapshotsSpy: ReturnType<typeof spyOn>;
+
   beforeEach(() => {
-    vol.reset();
+    writeSnapshotSpy = spyOn(
+      fsSnapshotModule,
+      'writeStoredSnapshot'
+    ).mockImplementation(() => {});
+
+    readSnapshotSpy = spyOn(fsSnapshotModule, 'readStoredSnapshot');
+
+    listSnapshotsSpy = spyOn(
+      fsManifestModule,
+      'getSnapshotsDir'
+    ).mockReturnValue('/test/.bfloo/schema/snapshots');
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    writeSnapshotSpy.mockRestore();
+    readSnapshotSpy.mockRestore();
+    listSnapshotsSpy.mockRestore();
   });
 
   it('should create migration file with correct structure', async () => {
-    vol.fromJSON({
-      './migrations': null // directory
-    });
-
     await createMigration('create_users', './migrations');
 
-    const files = vol.readdirSync('./migrations');
-    expect(files).toHaveLength(1);
-    expect(files[0]).toMatch(/^\d{14}_create_users\.ts$/);
-
-    const content = vol.readFileSync(`./migrations/${files[0]}`, 'utf8');
-    expect(content).toContain('export async function up');
-    expect(content).toContain('export async function down');
+    expect(writeSnapshotSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}_create_users\.yml$/),
+      expect.objectContaining({
+        tables: expect.any(Array)
+      })
+    );
   });
 
   it('should list pending migrations in order', async () => {
-    vol.fromJSON({
-      './migrations/20240101120000_first.ts': 'export const up = () => {};',
-      './migrations/20240102120000_second.ts': 'export const up = () => {};',
-      './migrations/20240103120000_third.ts': 'export const up = () => {};'
-    });
+    // Mock the manifest to return specific snapshots
+    const mockManifest = {
+      'schema-id': 'test-id',
+      snapshots: {
+        'id-1': { label: 'first', file: '2024-01-01_first.yml' },
+        'id-2': { label: 'second', file: '2024-01-02_second.yml' },
+        'id-3': { label: 'third', file: '2024-01-03_third.yml' }
+      }
+    };
+
+    spyOn(fsManifestModule, 'readManifest').mockReturnValue(mockManifest);
 
     const pending = await listPendingMigrations('./migrations', []);
 
@@ -244,16 +276,16 @@ describe('[Integration] - Database Operations', () => {
 
   beforeEach(() => {
     mockClient = {
-      query: vi.fn(),
-      release: vi.fn(),
-      connect: vi.fn()
+      query: mock(),
+      release: mock(),
+      connect: mock()
     };
 
-    vi.spyOn(DatabasePool, 'connect').mockResolvedValue(mockClient);
+    spyOn(DatabasePool, 'connect').mockResolvedValue(mockClient);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    mock.restore();
   });
 
   it('should apply migration with transaction', async () => {
@@ -293,33 +325,34 @@ describe('[Integration] - Database Operations', () => {
 
 ### 5. **Error Propagation Tests**
 
-Test error handling across layers.
+Test error handling across layers using spies.
 
 ```typescript
+import * as apiModule from '../src/api/client';
+import * as fsConfigModule from '../src/fs/config';
+
 describe('[Integration] - Error Propagation', () => {
-  let cli: Command;
+  let configSpy: ReturnType<typeof spyOn>;
+  let apiSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    cli = createCli();
-    vol.reset();
+    configSpy = spyOn(fsConfigModule, 'readConfig').mockReturnValue({
+      database: 'postgres://localhost:5432/test'
+    });
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    configSpy.mockRestore();
+    if (apiSpy) apiSpy.mockRestore();
   });
 
   it('should propagate database errors to CLI', async () => {
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        database: 'postgres://localhost:5432/test'
-      })
-    });
-
-    vi.spyOn(DatabasePool, 'connect').mockRejectedValue(
+    apiSpy = spyOn(apiModule.ApiClient.schema, 'getByApiKey').mockRejectedValue(
       new Error('Connection refused')
     );
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+    const cli = createCli();
+    const exitSpy = spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
@@ -328,16 +361,16 @@ describe('[Integration] - Error Propagation', () => {
     ).rejects.toThrow();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
   it('should show user-friendly error messages', async () => {
-    vol.fromJSON({
-      './rune.config.json': JSON.stringify({
-        database: 'invalid-url'
-      })
+    configSpy.mockImplementation(() => {
+      throw new Error('Invalid database URL');
     });
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const cli = createCli();
+    const consoleSpy = spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(
       cli.parseAsync(['node', 'rune', 'migrate', 'up'])
@@ -346,6 +379,7 @@ describe('[Integration] - Error Propagation', () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid database URL')
     );
+    consoleSpy.mockRestore();
   });
 });
 ```
@@ -384,19 +418,50 @@ describe('[Integration] - Error Propagation', () => {
 
 ## Testing Patterns
 
-### Setup Virtual File System
+### Mock File System Operations with spyOn
+
+Instead of using memfs (which requires an additional dependency), mock the file system
+functions from your own modules using `spyOn`:
 
 ```typescript
-import { vol } from 'memfs';
+import * as fsConfigModule from '../src/fs/config';
+import * as fsPathsModule from '../src/fs/paths';
 
-vi.mock('fs/promises');
+let configSpy: ReturnType<typeof spyOn>;
+let pathsSpy: ReturnType<typeof spyOn>;
 
 beforeEach(() => {
-  vol.reset();
-  vol.fromJSON({
-    './config.json': JSON.stringify({ key: 'value' }),
-    './migrations': null
+  // Mock your fs wrapper functions
+  configSpy = spyOn(fsConfigModule, 'readConfig').mockReturnValue({
+    key: 'value'
   });
+
+  pathsSpy = spyOn(fsPathsModule, 'findProjectRoot').mockReturnValue(null);
+});
+
+afterEach(() => {
+  configSpy.mockRestore();
+  pathsSpy.mockRestore();
+});
+```
+
+### Mock fs Module Directly (when needed)
+
+For low-level fs operations, use `mock.module`:
+
+```typescript
+beforeEach(() => {
+  mock.module('fs', () => ({
+    existsSync: () => false,
+    mkdirSync: () => {},
+    rmSync: () => {},
+    readFileSync: () => '',
+    writeFileSync: () => {}
+  }));
+});
+
+afterEach(() => {
+  mock.restore();
 });
 ```
 
@@ -407,10 +472,10 @@ let mockClient: MockClient;
 
 beforeEach(() => {
   mockClient = {
-    query: vi.fn(),
-    release: vi.fn()
+    query: mock(),
+    release: mock()
   };
-  vi.spyOn(Pool.prototype, 'connect').mockResolvedValue(mockClient);
+  spyOn(Pool.prototype, 'connect').mockResolvedValue(mockClient);
 });
 ```
 
@@ -418,7 +483,7 @@ beforeEach(() => {
 
 ```typescript
 it('should output success message', async () => {
-  const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
   await cli.parseAsync(['node', 'rune', 'status']);
 
@@ -432,7 +497,7 @@ it('should output success message', async () => {
 
 ```typescript
 it('should exit with code 1 on error', async () => {
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+  const exitSpy = spyOn(process, 'exit').mockImplementation(() => {
     throw new Error('exit');
   });
 
@@ -448,18 +513,20 @@ it('should exit with code 1 on error', async () => {
 - [ ] File name ends with `.integration.test.ts`
 - [ ] Mirror source structure in tests directory
 - [ ] Test multiple components working together
-- [ ] Mock external services (database, network)
-- [ ] Use memfs for file system mocking
+- [ ] Mock external services (database, network, API)
+- [ ] Use spyOn for mocking internal module functions
+- [ ] Use mock.module for low-level Node.js module mocking when needed
 - [ ] Proper setup/teardown for test isolation
 - [ ] Test both success and error scenarios
 - [ ] Verify transaction management (BEGIN, COMMIT, ROLLBACK)
 - [ ] Test error propagation
 - [ ] Verify resource cleanup
 - [ ] **NEVER bypass the type system or use `any` type unless absolutely necessary**
-- [ ] **ALWAYS run tests after writing them: `pnpm test:run`**
-- [ ] **ALWAYS run linting after writing tests: `pnpm lint`**
-- [ ] **ALWAYS run type checks after writing tests: `pnpm typecheck`**
+- [ ] **ALWAYS run tests after writing them: `bun test:run`**
+- [ ] **ALWAYS run linting after writing tests: `bun lint`**
+- [ ] **ALWAYS run type checks after writing tests: `bun typecheck`**
 - [ ] **Fix all errors from tests, linting, and type checking before considering the task complete**
+- [ ] **Coverage threshold: Aim for 80% coverage on functions and lines**
 
 ## Test Organization
 
@@ -492,8 +559,8 @@ it('should exit with code 1 on error', async () => {
 
 ## Performance Guidelines
 
-- Reset virtual file system in `beforeEach`
-- Restore all mocks in `afterEach`
+- Restore all spies in `afterEach` using `.mockRestore()`
+- Use `mock.restore()` to clean up module mocks
 - Use connection pooling mocks
 - Avoid actual network calls
 - Keep tests focused and fast
@@ -503,7 +570,7 @@ it('should exit with code 1 on error', async () => {
 ### Mock Process Exit
 
 ```typescript
-const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+const exitSpy = spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit');
 });
 ```
@@ -512,11 +579,11 @@ const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
 
 ```typescript
 beforeEach(() => {
-  vi.stubEnv('DATABASE_URL', 'postgres://test:test@localhost/test');
+  process.env.DATABASE_URL = 'postgres://test:test@localhost/test';
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  delete process.env.DATABASE_URL;
 });
 ```
 
@@ -529,10 +596,10 @@ let stderr: string[] = [];
 beforeEach(() => {
   stdout = [];
   stderr = [];
-  vi.spyOn(console, 'log').mockImplementation((...args) =>
+  spyOn(console, 'log').mockImplementation((...args) =>
     stdout.push(args.join(' '))
   );
-  vi.spyOn(console, 'error').mockImplementation((...args) =>
+  spyOn(console, 'error').mockImplementation((...args) =>
     stderr.push(args.join(' '))
   );
 });

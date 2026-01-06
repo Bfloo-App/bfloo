@@ -26,10 +26,18 @@ Mirror the source directory structure in the `tests/` directory:
 
 ```typescript
 // Package imports
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  spyOn,
+  mock
+} from 'bun:test';
 
 // Project imports
-import { createHelloCommand } from '../src/commands/hello.js';
+import { createHelloCommand } from '../src/commands/hello';
 
 describe('[Unit] - createHelloCommand', () => {
   // Test cases go here
@@ -193,10 +201,10 @@ describe('[Unit] - parseConnectionString', () => {
 
 ```typescript
 describe('[Unit] - hello command action', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn>;
+  let consoleSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -221,24 +229,64 @@ describe('[Unit] - hello command action', () => {
 
 ### Mock Dependencies
 
+Use `spyOn` to mock imported module functions. This is the preferred approach
+as it doesn't require external dependencies like memfs.
+
 ```typescript
+import { spyOn, mock } from 'bun:test';
+import * as fsConfigModule from '../src/fs/config';
+
 describe('[Unit] - readConfig', () => {
+  let readConfigSpy: ReturnType<typeof spyOn>;
+
   beforeEach(() => {
-    vi.mock('fs/promises', () => ({
-      readFile: vi.fn()
-    }));
+    // Mock specific functions from imported modules
+    readConfigSpy = spyOn(fsConfigModule, 'readConfig');
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    readConfigSpy.mockRestore();
   });
 
   it('should read and parse config file', async () => {
     const mockConfig = { database: 'test' };
-    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockConfig));
+    readConfigSpy.mockReturnValue(mockConfig);
 
-    const result = await readConfig('./config.json');
+    const result = readConfig('./config.json');
     expect(result).toEqual(mockConfig);
+  });
+
+  it('should throw when config file not found', () => {
+    readConfigSpy.mockImplementation(() => {
+      throw new Error('Config not found');
+    });
+
+    expect(() => readConfig('./config.json')).toThrow('Config not found');
+  });
+});
+```
+
+### Mock Entire Modules (when needed)
+
+For low-level Node.js modules, use `mock.module`:
+
+```typescript
+import { mock } from 'bun:test';
+
+describe('[Unit] - fileOperations', () => {
+  beforeEach(() => {
+    mock.module('fs', () => ({
+      existsSync: () => true,
+      readFileSync: () => '{"key": "value"}'
+    }));
+  });
+
+  afterEach(() => {
+    mock.restore();
+  });
+
+  it('should check if file exists', () => {
+    // Your test here
   });
 });
 ```
@@ -266,17 +314,19 @@ describe('[Unit] - validateConfig', () => {
 - [ ] Use `[Unit] - functionName` describe format
 - [ ] File name ends with `.test.ts`
 - [ ] Mirror source structure in tests directory
-- [ ] Import from project using relative paths with `.js` extension
-- [ ] Test utility in isolation
+- [ ] Import from project using relative paths (no `.js` extension needed with Bun)
+  - [ ] Test utility in isolation
 - [ ] Test command structure for CLI commands
 - [ ] Test edge cases and error scenarios
-- [ ] Use spies for console output
-- [ ] Mock file system and external dependencies
+- [ ] Use spies for console output and module functions
+- [ ] Use `spyOn` for mocking imported module functions (preferred)
+- [ ] Use `mock.module` for low-level Node.js module mocking (when needed)
 - [ ] **NEVER bypass the type system or use `any` type unless absolutely necessary**
-- [ ] **ALWAYS run tests after writing them: `pnpm test:run`**
-- [ ] **ALWAYS run linting after writing tests: `pnpm lint`**
-- [ ] **ALWAYS run type checks after writing tests: `pnpm typecheck`**
+- [ ] **ALWAYS run tests after writing them: `bun test:run`**
+- [ ] **ALWAYS run linting after writing tests: `bun lint`**
+- [ ] **ALWAYS run type checks after writing tests: `bun typecheck`**
 - [ ] **Fix all errors from tests, linting, and type checking before considering the task complete**
+- [ ] **Coverage threshold: Aim for 80% coverage on functions and lines**
 
 ## Test Organization
 
@@ -311,7 +361,7 @@ describe('[Unit] - validateConfig', () => {
 ## Performance Guidelines
 
 - Clean up all spies and mocks in `afterEach`
-- Use `vi.clearAllMocks()` for cleanup
+- Use `mock.restore()` for cleanup
 - Keep tests fast and focused
 - Avoid unnecessary async operations
 
@@ -320,10 +370,10 @@ describe('[Unit] - validateConfig', () => {
 ### Mock Callbacks
 
 ```typescript
-let mockCallback: ReturnType<typeof vi.fn>;
+let mockCallback: ReturnType<typeof mock>;
 
 beforeEach(() => {
-  mockCallback = vi.fn();
+  mockCallback = mock();
 });
 ```
 

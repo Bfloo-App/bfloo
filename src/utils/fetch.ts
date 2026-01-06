@@ -1,6 +1,21 @@
 // Project imports
-import { CliError } from '$error';
+import { CliError, ErrorCode } from '$error';
 import { DEFAULT_TIMEOUT_MS } from '$constants';
+
+/**
+ * Bun network error codes that indicate a connection failure.
+ * @see https://bun.sh/docs/api/fetch
+ */
+const NETWORK_ERROR_CODES = new Set([
+  'ConnectionRefused',
+  'ConnectionReset',
+  'ConnectionAborted',
+  'ConnectionClosed',
+  'FailedToOpenSocket',
+  'HostUnreachable',
+  'NetworkUnreachable',
+  'UnableToResolveHost'
+]);
 
 /**
  * ### FetchOptions
@@ -56,11 +71,17 @@ export async function fetchWithTimeout(
       });
     }
 
-    // Handle other fetch errors (network failures, DNS, etc.)
-    if (err instanceof TypeError) {
+    // Handle Bun network errors (connection failures, DNS, etc.)
+    if (
+      err instanceof Error &&
+      'code' in err &&
+      typeof err.code === 'string' &&
+      NETWORK_ERROR_CODES.has(err.code)
+    ) {
       throw new CliError({
         title: 'Network Error',
         message: 'Could not connect to the API',
+        code: ErrorCode.NETWORK_ERROR,
         suggestions: ['Check your internet connection.'],
         cause: err
       });

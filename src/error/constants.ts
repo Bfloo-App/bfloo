@@ -3,7 +3,9 @@
  *
  * Enumeration of error codes for programmatic error handling.
  */
-export enum ErrorCode {}
+export enum ErrorCode {
+  NETWORK_ERROR = 'NETWORK_ERROR'
+}
 
 /**
  * ### EXIT_CODES

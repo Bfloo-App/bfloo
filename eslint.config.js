@@ -20,10 +20,28 @@ export default [
       prettier: eslintPluginPrettier
     },
     rules: {
-      'prettier/prettier': 'error'
+      'prettier/prettier': 'error',
+      'no-undef': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ]
     }
   },
   eslintConfigPrettier,
+  {
+    // Test file overrides - relax strict type-checking for test utilities like spies/mocks
+    files: ['tests/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-empty-function': 'off'
+    }
+  },
   {
     ignores: [
       'dist/**',

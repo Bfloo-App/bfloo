@@ -516,7 +516,7 @@ export const printer = {
       formatBoxedError(
         error.title,
         error.message,
-        error.code ? String(error.code) : undefined,
+        error.code,
         error.suggestions,
         error.hints,
         'fail'
