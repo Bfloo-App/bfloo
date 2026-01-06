@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Run lint-staged for formatting and linting
+echo "Running lint-staged..."
+bun lint-staged
+
+# Run typecheck
+echo "Running typecheck..."
+bun typecheck

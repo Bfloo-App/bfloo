@@ -1,0 +1,29 @@
+# Bun configuration
+# https://bun.sh/docs/runtime/bunfig
+
+[test]
+# Coverage thresholds - targeting 80% but starting lower while tests are added
+# Coverage thresholds set to 80%
+coverageThreshold = { line = 0.8, function = 0.8 }
+
+# Skip test files in coverage reports
+coverageSkipTestFiles = true
+
+# Ignore barrel export files and config files
+# Note: src/index.ts is the entry point and should be tested
+coveragePathIgnorePatterns = [
+  "src/api/index.ts",
+  "src/api/handlers/index.ts",
+  "src/commands/index.ts",
+  "src/commands/*/index.ts",
+  "src/constants/index.ts",
+  "src/error/index.ts",
+  "src/execution/index.ts",
+  "src/fs/index.ts",
+  "src/schemas/index.ts",
+  "src/schemas/*/index.ts",
+  "src/ui/index.ts",
+  "src/utils/index.ts",
+  "*.config.js",
+  "*.config.ts"
+]

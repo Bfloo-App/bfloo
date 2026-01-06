@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+# Validate commit message format (conventional commits)
+# Format: type(scope): description
+# Example: feat(auth): add login functionality
+
+# Allow merge commits and other Git-generated messages
+if grep -qE "^(Merge|Revert|Initial commit)" "$1"; then
+    echo "✅ Git-generated commit message accepted"
+    exit 0
+fi
+
+# Validate conventional commit format with expanded types
+if ! grep -qE "^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert|merge|release|hotfix|deps|security|breaking)(\(.+\))?: .{1,50}" "$1"; then
+    echo "❌ Invalid commit message format!"
+    echo ""
+    echo "Format: type(scope): description"
+    echo ""
+    echo "Types:"
+    echo "  feat     - New feature"
+    echo "  fix      - Bug fix"
+    echo "  docs     - Documentation changes"
+    echo "  style    - Code style (formatting, semicolons, etc.)"
+    echo "  refactor - Code refactoring"
+    echo "  test     - Adding or updating tests"
+    echo "  chore    - Maintenance tasks"
+    echo "  perf     - Performance improvements"
+    echo "  ci       - CI/CD changes"
+    echo "  build    - Build system changes"
+    echo "  deps     - Dependency updates"
+    echo "  security - Security fixes"
+    echo "  breaking - Breaking changes"
+    echo "  hotfix   - Urgent fixes"
+    echo "  revert   - Reverting changes"
+    echo "  merge    - Merge commits"
+    echo "  release  - Release commits"
+    echo ""
+    echo "Example: feat(auth): add login functionality"
+    echo ""
+    echo "Note: Merge commits and reverts are automatically accepted"
+    exit 1
+fi
+
+echo "✅ Commit message format is valid"
