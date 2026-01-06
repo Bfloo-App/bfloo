@@ -1,0 +1,69 @@
+{
+  "name": "bfloo",
+  "version": "0.0.1",
+  "description": "Manage database schemas like code. Version control, team collaboration, and seamless migrations.",
+  "type": "module",
+  "bin": {
+    "bfloo": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "build:binary": "bun build src/index.ts --compile --outfile ./bin/bfloo",
+    "start": "bun ./dist/index.js",
+    "test": "bun test --watch",
+    "test:run": "bun test",
+    "test:coverage": "bun test --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write --log-level warn .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "database",
+    "schema",
+    "migration",
+    "cli"
+  ],
+  "author": "bfloo",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.1.0",
+    "canonicalize": "^2.1.0",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "ora": "^9.0.0",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.8.2",
+    "zod": "^4.2.1"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

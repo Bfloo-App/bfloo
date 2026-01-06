@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    /* Emit */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    /* Strict Type-Checking */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "exactOptionalPropertyTypes": true,
+
+    /* Modules */
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "$commands": ["src/commands/index.ts"],
+      "$commands/*": ["src/commands/*"],
+      "$constants": ["src/constants/index.ts"],
+      "$constants/*": ["src/constants/*"],
+      "$error": ["src/error/index.ts"],
+      "$error/*": ["src/error/*"],
+      "$execution": ["src/execution/index.ts"],
+      "$execution/*": ["src/execution/*"],
+      "$fs": ["src/fs/index.ts"],
+      "$fs/*": ["src/fs/*"],
+      "$api": ["src/api/index.ts"],
+      "$api/*": ["src/api/*"],
+      "$schemas": ["src/schemas/index.ts"],
+      "$schemas/*": ["src/schemas/*"],
+      "$ui": ["src/ui/index.ts"],
+      "$ui/*": ["src/ui/*"],
+      "$utils": ["src/utils/index.ts"],
+      "$utils/*": ["src/utils/*"],
+      "@*": ["src/*"]
+    },
+
+    /* Completeness */
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
