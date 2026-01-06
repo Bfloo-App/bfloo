@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+bin/
+
+# IDE
+.idea/
+.vscode/
+
+# Test coverage
+coverage/
+
+# Changeset temp files
+.changeset/*.md
+!.changeset/README.md
+!.changeset/config.json
+
+# Lock file
+bun.lock
